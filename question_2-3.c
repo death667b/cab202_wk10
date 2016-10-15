@@ -60,26 +60,32 @@ int main() {
     draw_centred(24, "debugger...");
     show_screen();
     while(!usb_configured() || !usb_serial_get_control());
+    send_line("Debugger init. Debugging strings will appear below:");
 
     // Run the main loop displaying the system time @ ~10Hz...
     char buff[BUFF_LENGTH];
     unsigned long count = 0;
+    send_debug_string("Entering main loop...");
     while (1) {
         // Draw the current system time on the screen
         clear_screen();
         sprintf(buff, "%7.4f", get_system_time());
         draw_centred(21, buff);
+        send_debug_string("Calling show_screen()...");
         show_screen();
+        send_debug_string("Finished show_screen()...");
         _delay_ms(100);
 
         // Toggle LEDs if the conditions are met
         if ((count % 25) == 0) {
             PORTB ^= (1 << PB2);
+            send_debug_string("LED0 was toggled");
         }
         if ((count % 50) == 10) {
             PORTB ^= (1 << PB3);
+            send_debug_string("LED1 was toggled");
         }
-
+        enter_breakpoint(113);
         // Increment the loop count
         count++;
     }
@@ -93,7 +99,9 @@ int main() {
 */
 void send_debug_string(char* string) {
      // Send the debug preamble...
-     usb_serial_write("[DEBUG] ", 8);
+     char buff[15];
+     sprintf(buff, "[DBG %06.2f]", get_system_time());
+     usb_serial_write(buff, 11);
 
      // Send all of the characters in the string
      unsigned char char_count = 0;
@@ -102,7 +110,7 @@ void send_debug_string(char* string) {
          string++;
          char_count++;
      }
-
+     
      // Go to a new line (force this to be the start of the line)
      usb_serial_putchar('\r');
      usb_serial_putchar('\n');
@@ -117,6 +125,13 @@ void enter_breakpoint(unsigned long line_num) {
     // over serial. NOTHING except the serial connection and the incrementing of
     // ovf_count should still be happening.
     // TODO
+    char buff[40];
+    sprintf(buff, "Entered breakpoint @ line #<%03d>.", line_num);
+    send_debug_string(buff);
+    
+    TIMSK0 &= ~(1 << TOIE0);
+    while (usb_serial_getchar() != 'b');
+    TIMSK0 |= (1 << TOIE0);
 }
 
 void init_hardware(void) {
@@ -131,6 +146,7 @@ void init_hardware(void) {
 
     // Initialise the USB serial
     usb_init();
+
 
     // Setup two timers with overflow interrupts:
     // 0 - button press checking @ ~30Hz
@@ -198,9 +214,11 @@ ISR(TIMER0_OVF_vect) {
     if ((PINF>>PF5) & 1) {
         _delay_ms(75);
         while((PINF>>PF5) & 1);
+        send_debug_string("SW3 Detected");
     }
 }
 
 ISR(TIMER1_OVF_vect) {
     ovf_count++;
+    send_debug_string("TIMER1 overflowed");
 }
