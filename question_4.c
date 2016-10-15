@@ -92,12 +92,15 @@ void init_hardware(void) {
     // LEDs toggling every time you send a character, then the interrupt isn't
     // running!
     // TODO
+    UCSR1B |= (1<<TXCIE1);
 
     // Set the UART prescaler so that we get the desired baud rate
     // TODO
+    UBRR1 = BAUD_PRESCALER; 
 
     // Enable transmission of UART data
     // TODO
+    UCSR1B |= (1<<TXEN1);          
 
     // Set the frame format to:
     // - Asynchronous normal mode
@@ -105,17 +108,32 @@ void init_hardware(void) {
     // - 1 stop bit
     // - No parity bits
     // TODO
+    UCSR1C &= ~(1<<UMSEL11); // Set to async
+    UCSR1C &= ~(1<<UMSEL10);
+
+    UCSR1C &= ~(1<<UPM11); // Set no parity
+    UCSR1C &= ~(1<<UPM10);
+
+    UCSR1C &= ~(1<<USBS1); // 1 stop bit
+
+    UCSR1C |=  (1<<UCSZ10); // set 8 data bits
+    UCSR1C |=  (1<<UCSZ11);
+    UCSR1B &= ~(1<<UCSZ12);
+    
 
     // Enable interrupts globally
     // TODO
+    sei();
 }
 
 void UART_send_char(char data) {
     // Wait until the transmit buffer is empty
     // TODO
-
+    while (!(( UCSR1A >> UDRE1) & 1));                // wait while register is free
+     
     // Send the character
     // TODO
+    UDR1 = data; 
 }
 
 unsigned char debounced_right_press() {
